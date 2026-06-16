@@ -19,3 +19,10 @@ When making changes, you **MUST** update this file to reflect anything new, upda
 ## Fork feature set
 
 This fork adds the following on top of upstream:
+
+### Print start (skip mesh)
+A `PRINT_START` macro that supports a `SKIP_MESH` parameter lets you skip bed mesh leveling on a print you trust the existing mesh for, saving the probing time at the start of every job. Doing this normally means hand-editing the gcode's `PRINT_START` line before each such print. This feature makes that a one-click action from the dashboard without touching the original file.
+
+- Adds a "Print start (skip mesh)" entry to the context menu of each gcode file row in the dashboard Status widget. On click it downloads the gcode, injects `SKIP_MESH=1` into the `PRINT_START` macro invocation line, writes the result to an untouched **sibling** file (`<name>.skipmesh.gcode`), and starts printing that sibling via `/server/files/upload` with `print=true`.
+- The menu entry is disabled under the same condition as the existing "Print start" entry (`printerIsPrinting || !klipperReadyForGui`), and surfaces an error toast when the selected file has no `PRINT_START` command.
+

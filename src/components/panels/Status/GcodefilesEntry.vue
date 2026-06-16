@@ -27,6 +27,10 @@
                     <v-icon class="mr-1">{{ mdiPlay }}</v-icon>
                     {{ $t('Files.PrintStart') }}
                 </v-list-item>
+                <v-list-item :disabled="printerIsPrinting || !klipperReadyForGui" @click="printSkipMesh">
+                    <v-icon class="mr-1">{{ mdiGridOff }}</v-icon>
+                    {{ $t('Files.PrintStartSkipMesh') }}
+                </v-list-item>
                 <v-list-item v-if="moonrakerComponents.includes('job_queue')" @click="addToQueue">
                     <v-icon class="mr-1">{{ mdiPlaylistPlus }}</v-icon>
                     {{ $t('Files.AddToQueue') }}
@@ -93,6 +97,7 @@ import {
     mdiFileDocumentEditOutline,
     mdiRenameBox,
     mdiDelete,
+    mdiGridOff,
 } from '@mdi/js'
 import Panel from '@/components/ui/Panel.vue'
 import AddBatchToQueueDialog from '@/components/dialogs/AddBatchToQueueDialog.vue'
@@ -100,6 +105,7 @@ import ConfirmationDialog from '@/components/dialogs/ConfirmationDialog.vue'
 import { convertPrintStatusIcon, convertPrintStatusIconColor, escapePath, formatPrintTime } from '@/plugins/helpers'
 import GcodefilesThumbnail from '@/components/panels/Gcodefiles/GcodefilesThumbnail.vue'
 import { CLOSE_CONTEXT_MENU, EventBus } from '@/plugins/eventBus'
+import { startPrintSkipMesh, SkipMeshMacroNotFoundError } from '@/extensions/skipMeshPrint'
 
 @Component({
     components: {
@@ -119,6 +125,7 @@ export default class StatusPanelGcodefilesEntry extends Mixins(BaseMixin, Contro
     mdiFileDocumentEditOutline = mdiFileDocumentEditOutline
     mdiRenameBox = mdiRenameBox
     mdiDelete = mdiDelete
+    mdiGridOff = mdiGridOff
 
     @Prop({ type: Object, required: true }) item!: FileStateGcodefile
     @Prop({ type: Number, required: true }) contentTdWidth!: number
@@ -204,6 +211,19 @@ export default class StatusPanelGcodefilesEntry extends Mixins(BaseMixin, Contro
         const href = this.apiUrl + '/server/files/gcodes/' + escapePath(this.item.filename)
 
         window.open(href)
+    }
+
+    async printSkipMesh() {
+        this.contextMenuShow = false
+        try {
+            await startPrintSkipMesh({ apiUrl: this.apiUrl, filename: this.item.filename })
+        } catch (e) {
+            const msg =
+                e instanceof SkipMeshMacroNotFoundError
+                    ? this.$t('Files.PrintStartSkipMeshNoMacro').toString()
+                    : this.$t('Files.PrintStartSkipMeshFailed').toString()
+            this.$toast.error(msg)
+        }
     }
 
     openRenameFileDialog() {
