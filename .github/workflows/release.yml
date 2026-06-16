@@ -1,14 +1,9 @@
 name: Release
 
-run-name: Release v${{ github.event.inputs.version }}
+run-name: Release from ${{ github.sha }}
 
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        type: string
-        description: New version number in X.Y.Z
-        required: true
 
 permissions:
   contents: write
@@ -24,24 +19,17 @@ jobs:
           ref: 'develop'
           fetch-depth: 0
 
-      - name: get-npm-version
-        id: package-version
-        uses: martinbeentjes/npm-get-version-action@main
-
-      - name: Push version number
-        if: steps.package-version.outputs.current-version != github.event.inputs.version
+      - name: Derive version from base + short hash
+        id: ver
         shell: bash
         run: |
-          npm version --no-git-tag-version ${{ github.event.inputs.version }}
+          BASE=$(node -p "require('./package.json').version.split('-')[0]")
+          HASH=$(git rev-parse --short HEAD)
+          echo "version=${BASE}-g${HASH}" >> "$GITHUB_OUTPUT"
 
-      - name: git add & commit & push
-        if: steps.package-version.outputs.current-version != github.event.inputs.version
-        uses: EndBug/add-and-commit@v9
-        with:
-          add: 'package.json package-lock.json'
-          default_author: github_actions
-          message: 'chore: push version number to v${{ github.event.inputs.version }}'
-          push: true
+      - name: Stamp version into package.json
+        shell: bash
+        run: npm version --no-git-tag-version --allow-same-version "${{ steps.ver.outputs.version }}"
 
       - name: Install node
         uses: actions/setup-node@v6
@@ -62,7 +50,7 @@ jobs:
         id: latest_tag
         shell: bash
         run: |
-          echo "TAG_NAME=$(git describe --tags $(git rev-list --tags --max-count=1))" >> $GITHUB_OUTPUT
+          echo "TAG_NAME=$(git describe --tags --abbrev=0)" >> "$GITHUB_OUTPUT"
 
       - name: Generate a changelog
         uses: orhun/git-cliff-action@v4
@@ -75,8 +63,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         id: create-release
         with:
-          name: v${{ github.event.inputs.version }}
-          tag_name: v${{ github.event.inputs.version }}
+          name: v${{ steps.ver.outputs.version }}
+          tag_name: v${{ steps.ver.outputs.version }}
           target_commitish: develop
           files: ./mainsail.zip
           body: ${{ steps.generate-changelog.outputs.content }}
@@ -96,7 +84,7 @@ jobs:
         id: latest_tag
         shell: bash
         run: |
-          echo "TAG_NAME=$(git describe --tags $(git rev-list --tags --max-count=1))" >> $GITHUB_OUTPUT
+          echo "TAG_NAME=$(git describe --tags --abbrev=0)" >> "$GITHUB_OUTPUT"
 
       - name: Generate a changelog
         uses: orhun/git-cliff-action@v4
